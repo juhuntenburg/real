@@ -10,7 +10,7 @@ import nipype.algorithms.rapidart as ra
 from functions import strip_rois_func, motion_regressors, median
 
 dataset = 'CL181030fmrssouris3'
-scans = ['4']#, '26']
+scans = ['4', '26']
 recons = ['real', 'mag']
 
 vol_to_remove = 10
@@ -40,7 +40,7 @@ recon_infosource = Node(util.IdentityInterface(fields=['recon']),
 recon_infosource.iterables=[('recon', recons)]
 
 # select files
-templates = {'func' : 'raw/{scan}/converted/data_{recon}.nii.gz',
+templates = {'func' : 'processed/func/{scan}/data_{recon}.nii.gz',
              'mask' : 'processed/func/{scan}/func_mask.nii.gz',
              'struct' : 'processed/struct/struct_masked.nii.gz'
             }

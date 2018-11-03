@@ -22,9 +22,9 @@
 clear all;
 addpath(genpath('/home/julia/workspace/real/'));
 
-dataset='CL181030fmrssouris3';
-scan='26';
-recon='3';
+dataset='CL181028fmrsmouse1';
+scan='33';
+recon='2';
 data_dir=strcat('/home/julia/projects/real_data/mouse_visual/', dataset, filesep, 'raw/', scan, filesep);
 mask_mat=strcat('/home/julia/projects/real_data/mouse_visual/', dataset, filesep, 'processed/func/', scan, filesep, 'func_mask.mat');
 
@@ -120,6 +120,6 @@ parfor z=1:nz %%%% loop over slices
 end
 
 data = corrected_real_data;
-save(strcat(data_dir,'data_real.mat'), 'data');
+save(strcat(data_dir,'converted/data_real.mat'), 'data');
 data = sos_mag_data;
-save(strcat(data_dir,'data_mag.mat'),'data');
+save(strcat(data_dir,'converted/data_mag.mat'),'data');

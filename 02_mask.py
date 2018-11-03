@@ -5,18 +5,18 @@ import nipype.interfaces.fsl as fsl
 import scipy.io as sio
 import nibabel as nb
 
-dataset = "CL181030fmrssouris3"
+dataset = "CL181102fmrssouris9"
 scan = "26"
 
 data_dir = "/home/julia/projects/real_data/mouse_visual/%s/"%dataset
-in_file = data_dir + "raw/%s/converted/%s_%s.nii.gz"%(scan, dataset, scan)
-mean_file = data_dir + "raw/%s/converted/%s_%s_mean.nii.gz"%(scan, dataset, scan)
-bias_file = data_dir + "raw/%s/converted/%s_%s_mean_corr.nii.gz"%(scan, dataset, scan)
+in_file = data_dir + "raw/%s/converted/%s/%s_%s/%s_%s.nii.gz"%(scan, dataset, dataset, scan, dataset, scan)
+mean_file = data_dir + "raw/%s/converted/%s/%s_%s/%s_%s_mean.nii.gz"%(scan, dataset, dataset, scan, dataset, scan)
+bias_file = data_dir + "raw/%s/converted/%s/%s_%s/%s_%s_mean_corr.nii.gz"%(scan, dataset, dataset, scan, dataset, scan)
 mask_file = data_dir + "processed/func/%s/func_mask.nii.gz"%scan
 mask_mat = data_dir + "processed/func/%s/func_mask.mat"%scan
 
 if not os.path.isdir(data_dir + "processed/func/%s"%scan):
-    os.mkdir(data_dir + "processed/func/%s"%scan)
+    os.makedirs(data_dir + "processed/func/%s"%scan)
 
 print("Compute mean")
 mean = fsl.MeanImage(dimension='T',

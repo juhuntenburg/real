@@ -5,12 +5,12 @@ import nipype.interfaces.ants as ants
 import nipype.interfaces.afni as afni
 import nipype.interfaces.freesurfer as fs
 
-dataset = 'CL181030fmrssouris3'
+dataset = 'CL181102fmrssouris9'
 struct = '3'
 
 
 # directories
-working_dir = '/home/julia/projects/real_data/working_dir/'
+working_dir = '/home/julia/projects/real_data/working_dir/9/'
 data_dir= '/home/julia/projects/real_data/mouse_visual/%s/raw/'%dataset
 out_dir = '/home/julia/projects/real_data/mouse_visual/%s/processed/struct/'%dataset
 
@@ -21,11 +21,12 @@ preproc_struct.config['execution']['crashdump_dir'] = preproc_struct.base_dir + 
 
 
 # select files
-templates = {'struct' : '{struct}/converted/*{struct}.nii.gz',
+templates = {'struct' : '{struct}/converted/{dataset}/{dataset}_{struct}/{dataset}_{struct}.nii.gz'
            }
 selectfiles = Node(nio.SelectFiles(templates, base_directory=data_dir),
                    name="selectfiles")
 selectfiles.inputs.struct = struct
+selectfiles.inputs.dataset = dataset
 
 
 # Bias field correction
