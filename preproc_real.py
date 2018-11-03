@@ -8,7 +8,7 @@ import nipype.interfaces.ants as ants
 import nipype.interfaces.afni as afni
 import nipype.interfaces.freesurfer as fs
 import nipype.algorithms.rapidart as ra
-from functions import strip_rois_func, motion_regressors, median, selectindex, nilearn_denoise, weighted_avg, pca_denoising
+from functions import strip_rois_func, motion_regressors, median
 
 dataset = 'CL181030fmrssouris3'
 struct = ''
@@ -23,7 +23,7 @@ TR = 1
 # directories
 working_dir = '/home/julia/projects/real_data/working_dir/'
 data_dir= '/home/julia/projects/real_data/mouse_visual/'
-out_dir = '/home/julia/projects/real_data/mouse_visual/''
+out_dir = '/home/julia/projects/real_data/mouse_visual/'
 
 # main workflow
 preproc = Workflow(name='preproc')
@@ -37,7 +37,7 @@ recon_infosource.iterables=[('recon', recons)]
 
 # select files
 templates = {'func' : '{dataset}/recon/data_{recon}.nii.gz',
-             'struct' : ''
+             #'struct' : ''
            }
 selectfiles = Node(nio.SelectFiles(templates, base_directory=data_dir),
                    name="selectfiles")
@@ -83,6 +83,12 @@ func_mask = Node(afni.Automask(dilate=1, args='-peels 3',
                  name='func_mask')
 
 preproc.connect([(biasfield, func_mask, [('output_image', 'in_file')])])
+
+apply_func = Node(fsl.ApplyMask(out_file='struct_masked.nii.gz'), name='apply_func')
+
+preproc.connect([(func_mask, apply_func, [('out_file','mask_file')]),
+                 (biasfield, apply_func, [('output_image','in_file')])
+                ])
 
 
 # artefact detection
@@ -131,66 +137,66 @@ preproc.connect([(moco, motreg, [('par_file','motion_params')])])
 ############################
 
 # Bias field correction
-struct_bias = Node(ants.N4BiasFieldCorrection(dimension=3,
-                                              n_iterations=[100,100,100,100],
-                                              convergence_threshold=0.0,),
-                                              name='struct_bias')
-
-preproc.connect([(selectfiles, struct_bias, [('struct', 'input_image')])])
-
-
-# Skull stripping
-skullstrip = Node(afni.SkullStrip(outputtype='NIFTI_GZ',
-                                  args='-rat -push_to_edge'),
-                  name='skullstrip')
-preproc.connect([(struct_bias, skullstrip, [('output_image','in_file')])])
-
-# Binarize mask
-struct_mask = Node(fs.Binarize(out_type = 'nii.gz', min=0.1,
-                   binary_file='struct_mask.nii.gz'), name='struct_mask')
-preproc.connect([(skullstrip, struct_mask, [('out_file','in_file')])])
-
-# Apply mask
-apply_struct = Node(fsl.ApplyMask(out_file='struct_masked.nii.gz'), name='apply_struct')
-
-preproc.connect([(struct_mask, apply_struct, [('binary_file','mask_file')]),
-                 (struct_bias, apply_struct, [('output_image','in_file')])
-                ])
-
-
-################
-# Registration #
-################
-
-coreg = Node(ants.Registration(output_warped_image = out_dir + 'func2struct_mean.nii.gz',
-                         output_transform_prefix = out_dir + 'func2struct_',
-                         dimension = 3,
-                         transforms = ['Rigid', 'SyN'],
-                         metric = ['MI', 'CC'],
-                         transform_parameters = [(0.1,),(0.1, 3.0, 0)],
-                         metric_weight = [1,1],
-                         radius_or_number_of_bins = [32,4],
-                         sampling_percentage = [0.33, None],
-                         sampling_strategy = ['Regular', None],
-                         convergence_threshold = [1.e-11, 1.e-6],
-                         convergence_window_size = [10,10],
-                         smoothing_sigmas = [[0],[0,0]],
-                         sigma_units = ['vox', 'vox'],
-                         shrink_factors = [[1],[2,1]],
-                         use_estimate_learning_rate_once = [False, False],
-                         use_histogram_matching = [False, True],
-                         number_of_iterations = [[300], [50,10]],
-                         collapse_output_transforms = True,
-                         winsorize_lower_quantile = 0.05,
-                         winsorize_upper_quantile = 0.95,
-                         args = '--float',
-                         num_threads = 3,
-                         initial_moving_transform_com = True,
-                         )
-
-preproc.connect([(apply_struct, coreg, [('out_file','fixed_image')]),
-                 (apply_func, coreg, [('out_file','moving_image')])
-                ])
+# struct_bias = Node(ants.N4BiasFieldCorrection(dimension=3,
+#                                               n_iterations=[100,100,100,100],
+#                                               convergence_threshold=0.0,),
+#                                               name='struct_bias')
+#
+# preproc.connect([(selectfiles, struct_bias, [('struct', 'input_image')])])
+#
+#
+# # Skull stripping
+# skullstrip = Node(afni.SkullStrip(outputtype='NIFTI_GZ',
+#                                   args='-rat -push_to_edge'),
+#                   name='skullstrip')
+# preproc.connect([(struct_bias, skullstrip, [('output_image','in_file')])])
+#
+# # Binarize mask
+# struct_mask = Node(fs.Binarize(out_type = 'nii.gz', min=0.1,
+#                    binary_file='struct_mask.nii.gz'), name='struct_mask')
+# preproc.connect([(skullstrip, struct_mask, [('out_file','in_file')])])
+#
+# # Apply mask
+# apply_struct = Node(fsl.ApplyMask(out_file='struct_masked.nii.gz'), name='apply_struct')
+#
+# preproc.connect([(struct_mask, apply_struct, [('binary_file','mask_file')]),
+#                  (struct_bias, apply_struct, [('output_image','in_file')])
+#                 ])
+#
+#
+# ################
+# # Registration #
+# ################
+#
+# coreg = Node(ants.Registration(output_warped_image = out_dir + 'func2struct_mean.nii.gz',
+#                          output_transform_prefix = out_dir + 'func2struct_',
+#                          dimension = 3,
+#                          transforms = ['Rigid', 'SyN'],
+#                          metric = ['MI', 'CC'],
+#                          transform_parameters = [(0.1,),(0.1, 3.0, 0)],
+#                          metric_weight = [1,1],
+#                          radius_or_number_of_bins = [32,4],
+#                          sampling_percentage = [0.33, None],
+#                          sampling_strategy = ['Regular', None],
+#                          convergence_threshold = [1.e-11, 1.e-6],
+#                          convergence_window_size = [10,10],
+#                          smoothing_sigmas = [[0],[0,0]],
+#                          sigma_units = ['vox', 'vox'],
+#                          shrink_factors = [[1],[2,1]],
+#                          use_estimate_learning_rate_once = [False, False],
+#                          use_histogram_matching = [False, True],
+#                          number_of_iterations = [[300], [50,10]],
+#                          collapse_output_transforms = True,
+#                          winsorize_lower_quantile = 0.05,
+#                          winsorize_upper_quantile = 0.95,
+#                          args = '--float',
+#                          num_threads = 1,
+#                          initial_moving_transform_com = True,
+#                          ), name='coreg')
+#
+# preproc.connect([(apply_struct, coreg, [('out_file','fixed_image')]),
+#                  (apply_func, coreg, [('out_file','moving_image')])
+#                 ])
 
 
 #############
@@ -217,17 +223,17 @@ preproc.connect([(recon_infosource, func_sink, [('recon', 'container')]),
                  # (regress, func_sink, [('denoised_img', '@denoised_img'),
                  #                  ('denoised_data', '@denoised_data'),
                  #                  ('confounds', 'confounds.@confounds')])
-                 (coreg, func_sink, [('warped_image', 'coreg.@masked'),
-                                     ('forward_transforms', 'coreg.@fwd'),
-                                     ('reverse_transforms', 'coreg.@rvs')])
+                 # (coreg, func_sink, [('warped_image', 'coreg.@masked'),
+                 #                     ('forward_transforms', 'coreg.@fwd'),
+                 #                     ('reverse_transforms', 'coreg.@rvs')])
                 ])
 
-struct_sink = Node(nio.DataSink(parameterization=False),name='struct_sink')
-struct_sink.inputs.base_directory = out_dir + dataset + '/struct'
-preproc.connect([(struct_mask, struct_sink, [('binary_file', '@mask')]),
-                 (struct_bias, struct_sink, [('output_image', '@corrected')]),
-                 (apply_struct, struct_sink, [('out_file', '@masked')])
-                 ])
+# struct_sink = Node(nio.DataSink(parameterization=False),name='struct_sink')
+# struct_sink.inputs.base_directory = out_dir + dataset + '/struct'
+# preproc.connect([(struct_mask, struct_sink, [('binary_file', '@mask')]),
+#                  (struct_bias, struct_sink, [('output_image', '@corrected')]),
+#                  (apply_struct, struct_sink, [('out_file', '@masked')])
+#                  ])
 
 
 preproc.run(plugin='MultiProc', plugin_args={'n_procs' : 2})
