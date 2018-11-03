@@ -4,8 +4,8 @@ import os
 from glob import glob
 from bruker2nifti.converter import Bruker2Nifti
 
-data_in = '/home/julia/projects/real_data/raw/4/'
-data_out = '/home/julia/projects/real_data/raw/4/converted/'
+data_in = '/home/julia/projects/real_data/mouse_visual/CL181030fmrssouris3/raw/'
+data_out = '/home/julia/projects/real_data/mouse_visual/CL181030fmrssouris3/raw/26/converted/'
 
 if not os.path.isdir(data_out):
     os.mkdir(data_out)

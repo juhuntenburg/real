@@ -16,34 +16,37 @@
 % 2010/07/23  Modified by Carey Smith
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%%%%%%%%%%
-consider adding thermal noise removal
-%%%%%%%%%%%%
 
+%%%%%%%%%%%% Consider adding thermal noise removal %%%%%%%%%%%
 
-addpath(genpath('/home/julia/workspace/lcfmri/matlab/'));
+clear all;
+addpath(genpath('/home/julia/workspace/real/'));
 
-data_dir='/home/julia/projects/lc/raw/visual_clem/4/';
-scan='2';
+dataset='CL181030fmrssouris3';
+scan='26';
+recon='3';
+data_dir=strcat('/home/julia/projects/real_data/mouse_visual/', dataset, filesep, 'raw/', scan, filesep);
+mask_mat=strcat('/home/julia/projects/real_data/mouse_visual/', dataset, filesep, 'processed/func/', scan, filesep, 'func_mask.mat');
+
 acq_params=readBrukerParamFile(strcat(data_dir,'acqp'));
 method_params=readBrukerParamFile(strcat(data_dir,'method'));
-visu_params=readBrukerParamFile(strcat(data_dir, filesep, 'pdata', filesep, scan, filesep, 'visu_pars'));
-[data, visu] = readBruker2dseq(strcat(data_dir, filesep, 'pdata', filesep, scan, filesep,'2dseq'), visu_params);
+visu_params=readBrukerParamFile(strcat(data_dir, filesep, 'pdata', filesep, recon, filesep, 'visu_pars'));
+[data, visu] = readBruker2dseq(strcat(data_dir, filesep, 'pdata', filesep, recon, filesep,'2dseq'), visu_params);
 data=squeeze(data);
 
-%%%%%% set this
-colref = 47;
-rowref = 57;
 
 %%%%% load mask mask
-mask_struct=load(strcat(data_dir, 'mask.mat'));
+mask_struct=load(mask_mat);
 mask=mask_struct.data;
 
 [nx,ny,nz,nt,ncoil]=size(data);
 
 corrected_real_data = zeros([nx,ny,nz,nt]);
-add_mag_data = zeros([nx,ny,nz,nt]);
+% add_mag_data = zeros([nx,ny,nz,nt]);
 sos_mag_data = zeros([nx,ny,nz,nt]);
+
+rowref = round(nx./2);
+colref = round(ny./2);
 
 parfor z=1:nz %%%% loop over slices
 
@@ -59,9 +62,7 @@ parfor z=1:nz %%%% loop over slices
         %%% check if FFT needs to be applied (if the middle point has a
         %%% lower value than the edges, present in all coils so just
         %%% checking for 1)
-        j = orig_data(:,:,1);
-        js = size(j);
-        if abs(j(round(js(1)./2), round(js(2)./2))) < (abs(j(round(js(1)./2),  js(2)-2)));
+        if abs(orig_data(rowref, colref, 1)) < 2.*(abs(orig_data(rowref,  ny-2)));
             for c=1:ncoil;
                 orig_data(:,:,c) = fftshift(orig_data(:,:,c),2);
             end;
@@ -84,10 +85,10 @@ parfor z=1:nz %%%% loop over slices
             im_phase_quality = PhaseDerivativeVariance_r1(im_phase);
 
             %% Automatically (default) or manually identify starting seed point on a phase quality map
-%             minp = im_phase_quality(2:end-1, 2:end-1); minp = min(minp(:));
-%             maxp = im_phase_quality(2:end-1, 2:end-1); maxp = max(maxp(:));
+%            minp = im_phase_quality(2:end-1, 2:end-1); minp = min(minp(:));
+%            maxp = im_phase_quality(2:end-1, 2:end-1); maxp = max(maxp(:));
 % %             %if(0)    % Chose starting point interactively
-%             figure; imagesc(im_phase_quality,[minp maxp]), colormap(gray), colorbar, axis square, axis off; title('Phase quality map');
+%            figure, imagesc(im_phase_quality,[minp maxp]), colormap(gray), colorbar, axis square, axis off; title('Phase quality map')
 % %             uiwait(msgbox('Select known true phase reference phase point. Black = high quality phase; white = low quality phase.','Phase reference point','modal'));
 % %             [xpoint,ypoint] = ginput(1);                %Select starting point for the guided floodfill algorithm
 % %             colref = round(xpoint);
@@ -113,14 +114,12 @@ parfor z=1:nz %%%% loop over slices
         end
 
         corrected_real_data(:,:,z,t) = sqrt(mean(real(orig_data.*(exp(-1i.*UPIm))),3));
-        add_mag_data(:,:,z,t) = sum(abs(mag_coils), 3);
+        % add_mag_data(:,:,z,t) = sum(abs(mag_coils), 3);
         sos_mag_data(:,:,z,t) = sqrt(sum(abs(mag_coils).^2, 3));
     end
 end
 
 data = corrected_real_data;
-save('/home/julia/projects/lc/nifti/visual_clem_nifti/CL181030fmrssouris3/CL181030fmrssouris3_4/data_real.mat','data');
-data = add_mag_data;
-save('/home/julia/projects/lc/nifti/visual_clem_nifti/CL181030fmrssouris3/CL181030fmrssouris3_4/data_added.mat','data');
+save(strcat(data_dir,'data_real.mat'), 'data');
 data = sos_mag_data;
-save('/home/julia/projects/lc/nifti/visual_clem_nifti/CL181030fmrssouris3/CL181030fmrssouris3_4/data_sos.mat','data');
+save(strcat(data_dir,'data_mag.mat'),'data');
