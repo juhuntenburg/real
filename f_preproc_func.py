@@ -7,20 +7,20 @@ import nipype.interfaces.ants as ants
 import nipype.interfaces.afni as afni
 import nipype.interfaces.freesurfer as fs
 import nipype.algorithms.rapidart as ra
-from functions import strip_rois_func, motion_regressors, median
+from functions.functions import strip_rois_func, motion_regressors, median, make_regress, selectindex
 
-dataset = 'CL181030fmrssouris3'
-scans = ['4', '26']
+dataset = 'CL181102fmrssouris9'
+scans = ['26']
 recons = ['real', 'mag']
 
 vol_to_remove = 10
-motion_norm = 0.04
-z_thr = 2
+motion_norm = 0.5
+z_thr = 3
 TR = 1
 
 
 # directories
-working_dir = '/home/julia/projects/real_data/working_dir/'
+working_dir = '/home/julia/projects/real_data/working_dir/8/'
 data_dir= '/home/julia/projects/real_data/mouse_visual/%s/'%dataset
 out_dir = '/home/julia/projects/real_data/mouse_visual/%s/processed/func/'%dataset
 
@@ -58,9 +58,16 @@ remove_vol = Node(util.Function(input_names=['in_file','t_min'],
 remove_vol.inputs.t_min = vol_to_remove
 preproc_func.connect([(selectfiles, remove_vol, [('func', 'in_file')])])
 
+# Apply mask (to make mag and real comparable)
+apply_func = Node(fsl.ApplyMask(), name='apply_func')
+
+preproc_func.connect([(selectfiles, apply_func, [('mask','mask_file')]),
+                        (remove_vol, apply_func, [('out_file','in_file')])
+                        ])
+
 # motion correction
 moco = Node(nipy.SpaceTimeRealigner(slice_times='asc_alt_2', tr=TR, slice_info=[2,1]),name="moco")
-preproc_func.connect([(remove_vol, moco, [('out_file', 'in_file')])])
+preproc_func.connect([(apply_func, moco, [('out_file', 'in_file')])])
 
 # compute median
 median = Node(util.Function(input_names=['in_files'],
@@ -90,46 +97,40 @@ motreg = Node(util.Function(input_names=['motion_params', 'order','derivatives']
                             output_names=['out_files'],
                             function=motion_regressors),
                  name='motion_regressors')
-motreg.inputs.order=2
-motreg.inputs.derivatives=2
+motreg.inputs.order=1
+motreg.inputs.derivatives=1
 preproc_func.connect([(moco, motreg, [('par_file','motion_params')])])
 
-# nuissance regression
-# regress = Node(util.Function(input_names=['in_file', 'brain_mask',
-#                                           'motreg_file', 'outlier_file',
-#                                           'bandpass', 'tr'],
-#                              output_names=['denoised_img', 'denoised_data',
-#                                            'confounds'],
-#                              function=nilearn_denoise), name='regress')
-# regress.inputs.tr = tr
-# regress.inputs.bandpass = bandpass
-#
-# preproc.connect([(moco, regress, [('out_file', 'in_file')]),
-#                  (func_mask, regress, [('out_file', 'brain_mask')]),
-#                  (motreg, regress, [(('out_files',selectindex,[0]), 'motreg_file')]),
-#                  (artefact, regress, [('outlier_files', 'outlier_file')])
-#                  ])
+# make regressors
+regress = Node(util.Function(input_names=['motreg_file', 'outlier_file', 'in_file'],
+                             output_names=['confounds'],
+                             function=make_regress), name='make_regress')
+
+preproc_func.connect([(motreg, regress, [(('out_files',selectindex,[0]), 'motreg_file')]),
+                      (moco, regress, [('out_file', 'in_file')]),
+                 (artefact, regress, [('outlier_files', 'outlier_file')])
+                 ])
 
 
 
-coreg = Node(ants.Registration(output_warped_image = out_dir + 'func2struct_mean.nii.gz',
-                         output_transform_prefix = out_dir + 'func2struct_',
+coreg = Node(ants.Registration(output_warped_image = 'func2struct_mean.nii.gz',
+                         output_transform_prefix = 'func2struct_',
                          dimension = 3,
-                         transforms = ['Rigid', 'SyN'],
-                         metric = ['MI', 'CC'],
-                         transform_parameters = [(0.1,),(0.1, 3.0, 0)],
+                         transforms = ['Rigid', 'Affine'],
+                         metric = ['MI', 'MI'],
+                         transform_parameters = [(0.1,),(0.1,)],
                          metric_weight = [1,1],
-                         radius_or_number_of_bins = [32,4],
-                         sampling_percentage = [0.33, None],
+                         radius_or_number_of_bins = [32,16],
+                         sampling_percentage = [0.33, 0.33],
                          sampling_strategy = ['Regular', None],
-                         convergence_threshold = [1.e-11, 1.e-6],
-                         convergence_window_size = [10,10],
-                         smoothing_sigmas = [[0],[0,0]],
+                         convergence_threshold = [1.e-11, 1.e-32],
+                         convergence_window_size = [10,30],
+                         smoothing_sigmas = [[0],[1,0]],
                          sigma_units = ['vox', 'vox'],
-                         shrink_factors = [[1],[2,1]],
+                         shrink_factors = [[1],[1,1]],
                          use_estimate_learning_rate_once = [False, False],
                          use_histogram_matching = [False, True],
-                         number_of_iterations = [[300], [50,10]],
+                         number_of_iterations = [[300], [500,250]],
                          collapse_output_transforms = True,
                          winsorize_lower_quantile = 0.05,
                          winsorize_upper_quantile = 0.95,
@@ -139,33 +140,53 @@ coreg = Node(ants.Registration(output_warped_image = out_dir + 'func2struct_mean
                          ), name='coreg')
 
 preproc_func.connect([(selectfiles, coreg, [('struct','fixed_image')]),
-                    (median, coreg, [('median_file','moving_image')])
+                      (median, coreg, [('median_file','moving_image')])
                     ])
+
+make_nii = Node(afni.Copy(outputtype='NIFTI', out_file='func_moco.nii'),
+                name="make_nii")
+preproc_func.connect([(moco, make_nii, [('out_file', 'in_file')])])
+
+
+# trans = Node(ants.ApplyTransforms(dimension=4, input_image_type=3,
+#                                   invert_transform_flags=[False],
+#                                   interpolation = 'BSpline'),name='trans')
+#
+#
+# preproc_func.connect([(moco, make_nii, [('out_file', 'in_file')])])
+#
+#
+# make_nii = Node(afni.Copy(outputtype='NIFTI', out_file='func_moco2struct.nii'),
+#                 name="make_nii")
+# preproc_func.connect([(moco, make_nii, [('out_file', 'in_file')])])
+
+
+make_nii_mask = Node(afni.Copy(outputtype='NIFTI', out_file='func_mask.nii'),
+                name="make_nii_mask")
+preproc_func.connect([(selectfiles, make_nii_mask, [('mask', 'in_file')])])
+
 
 def makebase(scan, out_dir):
     return out_dir + scan + '/'
 
 # Sink relevant files
 func_sink = Node(nio.DataSink(parameterization=False),name='func_sink')
-func_sink.inputs.base_directory = out_dir
-func_sink.inputs.regexp_substitutions = [('corr_.*_roi','func_moco')]
 preproc_func.connect([(recon_infosource, func_sink, [('recon', 'container')]),
                       (scan_infosource, func_sink, [(('scan', makebase, out_dir), 'base_directory')]),
-                      (moco, func_sink, [('out_file', '@realigned_file'),
-                                         ('par_file', 'confounds.@orig_motion')]),
+                      (moco, func_sink, [('par_file', 'confounds.@orig_motion')]),
                       (artefact, func_sink, [('norm_files', 'confounds.@norm_motion'),
                                        ('outlier_files', 'confounds.@outlier_files'),
                                        ('intensity_files', 'confounds.@intensity_files'),
                                        ('statistic_files', 'confounds.@outlier_stats'),
                                        ('plot_files', 'confounds.@outlier_plots')]),
-                      # (motreg, func_sink, [('out_files', 'confounds.@motreg')]),
-                      # (regress, func_sink, [('denoised_img', '@denoised_img'),
-                      #                  ('denoised_data', '@denoised_data'),
-                      #                  ('confounds', 'confounds.@confounds')])
-                      (coreg, func_sink, [('warped_image', 'coreg.@masked'),
-                                         ('forward_transforms', 'coreg.@fwd'),
-                                         ('reverse_transforms', 'coreg.@rvs')])
+                      (motreg, func_sink, [('out_files', 'confounds.@motreg')]),
+                      (regress, func_sink, [('confounds', 'confounds.@confounds')]),
+                      (coreg, func_sink, [('warped_image', '@masked'),
+                                         ('forward_transforms', '@fwd'),
+                                         ('reverse_transforms', '@rvs')]),
+                      (make_nii, func_sink, [('out_file', '@moco')]),
+                      (make_nii_mask, func_sink, [('out_file', '@mask')])
                     ])
 
 
-preproc_func.run(plugin='MultiProc', plugin_args={'n_procs' : 2})
+preproc_func.run(plugin='MultiProc', plugin_args={'n_procs' : 3})

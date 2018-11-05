@@ -18,21 +18,11 @@ def fix_hdr(data_file, header_file):
     return os.path.abspath(base + "_fixed.nii.gz")
 
 
-def nilearn_denoise(in_file, brain_mask, motreg_file, outlier_file, bandpass, tr):
-    """Clean time series using Nilearn high_variance_confounds to extract
-    CompCor regressors and NiftiMasker for regression of all nuissance regressors,
-    detrending, normalziation and bandpass filtering.
-    """
+def make_regress(in_file, motreg_file, outlier_file):
     import numpy as np
     import nibabel as nb
     import os
-    from nilearn.image import high_variance_confounds
-    from nilearn.input_data import NiftiMasker
     from nipype.utils.filemanip import split_filename
-
-    # reload niftis to round affines so that nilearn doesn't complain
-    #csf_nii=nb.Nifti1Image(nb.load(csf_mask).get_data(), np.around(nb.load(csf_mask).get_affine(), 2), nb.load(csf_mask).get_header())
-    #time_nii=nb.Nifti1Image(nb.load(in_file).get_data(),np.around(nb.load(in_file).get_affine(), 2), nb.load(in_file).get_header())
 
     # infer shape of confound array
     confound_len = nb.load(in_file).get_data().shape[3]
@@ -53,30 +43,14 @@ def nilearn_denoise(in_file, brain_mask, motreg_file, outlier_file, bandpass, tr
     # load motion regressors
     motion_regressor=np.genfromtxt(motreg_file)
 
-    # extract high variance confounds in wm/csf masks from motion corrected data
-    #csf_regressor=high_variance_confounds(time_nii, mask_img=csf_nii, detrend=True)
-    #global_regressor=high_variance_confounds(time_nii, mask_img=brain_nii, detrend=True)
-
-    # create Nifti Masker for denoising
-    denoiser=NiftiMasker(mask_img=brain_mask, standardize=True, detrend=True, high_pass=bandpass[1], low_pass=bandpass[0], t_r=tr)
-
     # denoise and return denoise data to img
     confounds=np.hstack((outlier_regressor, motion_regressor)) # csf regressor
-    denoised_data=denoiser.fit_transform(in_file, confounds=confounds)
-    denoised_img=denoiser.inverse_transform(denoised_data)
 
     # save
-    _, base, _ = split_filename(in_file)
-    img_fname = base + '_denoised.nii.gz'
-    nb.save(denoised_img, img_fname)
-
-    data_fname = base + '_denoised.npy'
-    np.save(data_fname, denoised_data)
-
     confound_fname = os.path.join(os.getcwd(), "all_confounds.txt")
     np.savetxt(confound_fname, confounds, fmt="%.10f")
 
-    return os.path.abspath(img_fname), os.path.abspath(data_fname), confound_fname
+    return confound_fname
 
 
 def weighted_avg(in_file, mask_file=None):
