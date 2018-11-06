@@ -1,10 +1,8 @@
 %%%%%%%%%%%%%%%%%%%%%% Input %%%%%%%%%%%%%%%%%%%%%
 
-data_dir='/home/julia/projects/real_data/mouse_visual/CL181102fmrssouris7/processed/func/';
-scan = {'3', '27'};
+data_dir='/home/julia/projects/real_data/mouse_visual/CL181102fmrssouris8/processed/func/';
+scan = {'4'};
 recon = {'mag', 'real'};
-
-
 
 spm('defaults','fMRI')
 
@@ -48,21 +46,20 @@ job_con.delete=1;
 job_maps.conspec.titlestr='';
 job_maps.conspec.contrasts=Inf;
 job_maps.conspec.threshdesc='none';
-job_maps.conspec.thresh=0.05;
+job_maps.conspec.thresh=0.001;
 job_maps.conspec.extent=8;
 job_maps.conspec.mask.none=1;
 job_maps.units=1;
 job_maps.print='ps';
-job_maps.export{1}.tspm.basename='005_8';
-% job_maps.write.tspm.basename='005_8'; %previous spm version
-
+job_maps.export{1}.tspm.basename='0001_8';
+% job_maps.write.tspm.basename='0001_8
 
 %%%%%%%%%%%%%%%%%% Computations %%%%%%%%%%%%%%%%%%
 
 for s=1:2
     for r=1:2
         job_spec.dir={[data_dir scan{s} filesep recon{r} filesep 'spm']};
-        h1 = spm_vol([data_dir scan{s} filesep recon{r} filesep 'func_moco.nii']);
+        h1 = spm_vol([data_dir scan{s} filesep recon{r} filesep 'sfunc_moco.nii']);
         h2 = struct2cell(h1);
         job_spec.sess.scans = h2(1,1);
         job_spec.sess.multi_reg={[data_dir scan{s} filesep recon{r} filesep 'confounds' filesep 'all_confounds.txt']};

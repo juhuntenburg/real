@@ -14,7 +14,7 @@ scans = ['26']
 recons = ['real', 'mag']
 
 vol_to_remove = 10
-motion_norm = 0.5
+motion_norm = 0.6
 z_thr = 3
 TR = 1
 
@@ -146,19 +146,6 @@ preproc_func.connect([(selectfiles, coreg, [('struct','fixed_image')]),
 make_nii = Node(afni.Copy(outputtype='NIFTI', out_file='func_moco.nii'),
                 name="make_nii")
 preproc_func.connect([(moco, make_nii, [('out_file', 'in_file')])])
-
-
-# trans = Node(ants.ApplyTransforms(dimension=4, input_image_type=3,
-#                                   invert_transform_flags=[False],
-#                                   interpolation = 'BSpline'),name='trans')
-#
-#
-# preproc_func.connect([(moco, make_nii, [('out_file', 'in_file')])])
-#
-#
-# make_nii = Node(afni.Copy(outputtype='NIFTI', out_file='func_moco2struct.nii'),
-#                 name="make_nii")
-# preproc_func.connect([(moco, make_nii, [('out_file', 'in_file')])])
 
 
 make_nii_mask = Node(afni.Copy(outputtype='NIFTI', out_file='func_mask.nii'),
