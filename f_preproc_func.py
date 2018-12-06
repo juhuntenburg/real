@@ -5,22 +5,21 @@ import nipype.interfaces.io as nio
 import nipype.interfaces.nipy as nipy
 import nipype.interfaces.ants as ants
 import nipype.interfaces.afni as afni
-import nipype.interfaces.freesurfer as fs
 import nipype.algorithms.rapidart as ra
 from functions.functions import strip_rois_func, motion_regressors, median, make_regress, selectindex
 
-dataset = 'CL181102fmrssouris9'
-scans = ['26']
-recons = ['real', 'mag']
+dataset = 'CL181102fmrssouris8'
+scans = ['4','27']
+recons = ['mag']
 
 vol_to_remove = 10
-motion_norm = 0.6
+motion_norm = 0.75
 z_thr = 3
 TR = 1
 
 
 # directories
-working_dir = '/home/julia/projects/real_data/working_dir/8/'
+working_dir = '/home/julia/projects/real_data/working_dir/'
 data_dir= '/home/julia/projects/real_data/mouse_visual/%s/'%dataset
 out_dir = '/home/julia/projects/real_data/mouse_visual/%s/processed/func/'%dataset
 
@@ -113,35 +112,35 @@ preproc_func.connect([(motreg, regress, [(('out_files',selectindex,[0]), 'motreg
 
 
 
-coreg = Node(ants.Registration(output_warped_image = 'func2struct_mean.nii.gz',
-                         output_transform_prefix = 'func2struct_',
-                         dimension = 3,
-                         transforms = ['Rigid', 'Affine'],
-                         metric = ['MI', 'MI'],
-                         transform_parameters = [(0.1,),(0.1,)],
-                         metric_weight = [1,1],
-                         radius_or_number_of_bins = [32,16],
-                         sampling_percentage = [0.33, 0.33],
-                         sampling_strategy = ['Regular', None],
-                         convergence_threshold = [1.e-11, 1.e-32],
-                         convergence_window_size = [10,30],
-                         smoothing_sigmas = [[0],[1,0]],
-                         sigma_units = ['vox', 'vox'],
-                         shrink_factors = [[1],[1,1]],
-                         use_estimate_learning_rate_once = [False, False],
-                         use_histogram_matching = [False, True],
-                         number_of_iterations = [[300], [500,250]],
-                         collapse_output_transforms = True,
-                         winsorize_lower_quantile = 0.05,
-                         winsorize_upper_quantile = 0.95,
-                         args = '--float',
-                         num_threads = 1,
-                         initial_moving_transform_com = True,
-                         ), name='coreg')
-
-preproc_func.connect([(selectfiles, coreg, [('struct','fixed_image')]),
-                      (median, coreg, [('median_file','moving_image')])
-                    ])
+# coreg = Node(ants.Registration(output_warped_image = 'func2struct_mean.nii.gz',
+#                          output_transform_prefix = 'func2struct_',
+#                          dimension = 3,
+#                          transforms = ['Rigid', 'Affine'],
+#                          metric = ['MI', 'MI'],
+#                          transform_parameters = [(0.1,),(0.1,)],
+#                          metric_weight = [1,1],
+#                          radius_or_number_of_bins = [32,16],
+#                          sampling_percentage = [0.33, 0.33],
+#                          sampling_strategy = ['Regular', None],
+#                          convergence_threshold = [1.e-11, 1.e-32],
+#                          convergence_window_size = [10,30],
+#                          smoothing_sigmas = [[0],[1,0]],
+#                          sigma_units = ['vox', 'vox'],
+#                          shrink_factors = [[1],[1,1]],
+#                          use_estimate_learning_rate_once = [False, False],
+#                          use_histogram_matching = [False, True],
+#                          number_of_iterations = [[300], [500,250]],
+#                          collapse_output_transforms = True,
+#                          winsorize_lower_quantile = 0.05,
+#                          winsorize_upper_quantile = 0.95,
+#                          args = '--float',
+#                          num_threads = 1,
+#                          initial_moving_transform_com = True,
+#                          ), name='coreg')
+#
+# preproc_func.connect([(selectfiles, coreg, [('struct','fixed_image')]),
+#                       (median, coreg, [('median_file','moving_image')])
+#                     ])
 
 make_nii = Node(afni.Copy(outputtype='NIFTI', out_file='func_moco.nii'),
                 name="make_nii")
@@ -161,6 +160,7 @@ func_sink = Node(nio.DataSink(parameterization=False),name='func_sink')
 preproc_func.connect([(recon_infosource, func_sink, [('recon', 'container')]),
                       (scan_infosource, func_sink, [(('scan', makebase, out_dir), 'base_directory')]),
                       (moco, func_sink, [('par_file', 'confounds.@orig_motion')]),
+                      (median, func_sink, [('median_file', '@median')]),
                       (artefact, func_sink, [('norm_files', 'confounds.@norm_motion'),
                                        ('outlier_files', 'confounds.@outlier_files'),
                                        ('intensity_files', 'confounds.@intensity_files'),
@@ -168,9 +168,9 @@ preproc_func.connect([(recon_infosource, func_sink, [('recon', 'container')]),
                                        ('plot_files', 'confounds.@outlier_plots')]),
                       (motreg, func_sink, [('out_files', 'confounds.@motreg')]),
                       (regress, func_sink, [('confounds', 'confounds.@confounds')]),
-                      (coreg, func_sink, [('warped_image', '@masked'),
-                                         ('forward_transforms', '@fwd'),
-                                         ('reverse_transforms', '@rvs')]),
+                      # (coreg, func_sink, [('warped_image', '@masked'),
+                      #                    ('forward_transforms', '@fwd'),
+                      #                    ('reverse_transforms', '@rvs')]),
                       (make_nii, func_sink, [('out_file', '@moco')]),
                       (make_nii_mask, func_sink, [('out_file', '@mask')])
                     ])
